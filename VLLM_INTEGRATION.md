@@ -160,3 +160,84 @@ python -m pytest test/test_vllm_preprocessing.py test/test_vllm_postprocessing.p
 | `8814178` | vLLM wrapper implementation (5 source + 5 test files) |
 | `80e5d5d` | Airline passengers forecasting demo |
 | `54b9bdd` | Mock vLLM serving tests (44 tests) |
+| `9808855` | Native vLLM implementation (`native.py`) + register.py update |
+| `476e5ac` | Native vLLM integration test suite (50 GPU tests) |
+
+---
+
+## Next Steps — GPU Setup and Native Test Run
+
+The native implementation (`src/chronos/chronos2/vllm/native.py`) and its test
+suite (`test/test_vllm_native.py`) are complete but require a CUDA GPU to run.
+All 50 tests auto-skip on non-CUDA machines.
+
+### 1. Provision a GPU instance
+
+Any of the following will work. A single T4 (16 GB) is sufficient for the
+dummy model; use an A10G or A100 if you want to test bfloat16.
+
+| Provider | Instance / Pod | GPU | Est. cost |
+|---|---|---|---|
+| Lambda Labs | `gpu_1x_a10` | A10G 24 GB | ~$0.60/hr |
+| RunPod | On-demand pod | A10G / T4 | ~$0.20–0.60/hr |
+| AWS EC2 | `g4dn.xlarge` | T4 16 GB | ~$0.53/hr |
+| GCP | `n1-standard-4` + T4 | T4 16 GB | ~$0.35/hr |
+
+### 2. Environment setup
+
+```bash
+# System deps (Ubuntu 22.04)
+sudo apt-get update && sudo apt-get install -y python3-pip git
+
+# Clone the repo
+git clone https://github.com/rangwala/chronos-forecasting.git
+cd chronos-forecasting
+
+# Install chronos + test deps
+pip install -e ".[test]"
+
+# Install vLLM (targets the API surface used in native.py)
+pip install "vllm>=0.6.0,<0.7"
+
+# Verify GPU is visible
+python -c "import torch; print('CUDA:', torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+```
+
+### 3. Run the native tests
+
+```bash
+# All 50 native GPU tests (phases 1–8, throughput excluded)
+pytest test/test_vllm_native.py -v
+
+# Include throughput benchmarks (batch=1/8/32)
+pytest test/test_vllm_native.py -v -m slow
+
+# Single phase (e.g., just weight loading)
+pytest test/test_vllm_native.py::TestWeightLoading -v
+
+# Full suite including existing mock tests
+pytest test/test_vllm_*.py -v
+```
+
+### 4. Expected results
+
+| Phase | Tests | Pass criteria |
+|---|---|---|
+| Registration | 5 | `ModelRegistry.is_registered("Chronos2ForForecasting")` |
+| Engine init | 8 | Model on CUDA, `IdentityPooler` attached, config correct |
+| Weight loading | 7 | `ff.wi`, `ff.wo`, `layer_norm`, QKV shape all match HF checkpoint |
+| Single forward | 6 | Shape `(num_quantiles * nop * patch_size,)`, finite, deterministic |
+| Batch forward | 5 | 4 requests/step, variable pred_len, minimal context |
+| Equivalence | 5 | Native vs wrapper within rtol=1e-3, atol=1e-3 |
+| Edge cases | 5 | All-NaN, >8192 context, constant/large/negative series |
+| bfloat16 | 4 | Ampere+ only; bf16 vs fp32 within rtol=0.02 |
+| Throughput | 3 | ≥ 1 req/s at batch=1/8/32 (prints actual req/s) |
+
+### 5. If a test fails
+
+| Symptom | Likely cause |
+|---|---|
+| `native` fixture skips | vLLM changed the engine attribute path — update `candidates` list in the fixture |
+| Equivalence tolerance exceeded | Fused kernel numerics differ — loosen `RTOL`/`ATOL` or check weight loading |
+| `PoolingParams` import error | vLLM version mismatch — check `from vllm import PoolingParams` fallback |
+| bfloat16 tests skip | GPU is pre-Ampere (compute capability < 8.0) — expected on T4 |

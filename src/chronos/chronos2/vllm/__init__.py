@@ -34,3 +34,10 @@ __all__ = [
     "register_with_vllm",
     "setup_vllm_integration",
 ]
+
+try:
+    from .native import Chronos2ForForecasting
+
+    __all__ = [*__all__, "Chronos2ForForecasting"]
+except ImportError:
+    pass  # vLLM not installed; native class unavailable

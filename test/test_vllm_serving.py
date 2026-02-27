@@ -336,7 +336,7 @@ class TestMockModelRegistry:
             assert result is True
             mock_vllm.ModelRegistry.register_model.assert_called_once_with(
                 "Chronos2ForForecasting",
-                "chronos.chronos2.vllm.wrapper:Chronos2ForVLLM",
+                "chronos.chronos2.vllm.native:Chronos2ForForecasting",
             )
 
 

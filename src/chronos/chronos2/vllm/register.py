@@ -76,7 +76,7 @@ def list_chronos2_models() -> list[str]:
 
 def register_with_vllm(
     model_name: str = "Chronos2ForForecasting",
-    model_class_path: str = "chronos.chronos2.vllm.wrapper:Chronos2ForVLLM",
+    model_class_path: str = "chronos.chronos2.vllm.native:Chronos2ForForecasting",
 ) -> bool:
     """
     Register Chronos-2 model with vLLM's model registry.
@@ -231,7 +231,7 @@ class Chronos2VLLMPlugin:
         for arch in cls.model_architectures:
             if not register_with_vllm(
                 model_name=arch,
-                model_class_path="chronos.chronos2.vllm.wrapper:Chronos2ForVLLM",
+                model_class_path="chronos.chronos2.vllm.native:Chronos2ForForecasting",
             ):
                 success = False
         return success

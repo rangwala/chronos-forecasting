@@ -71,6 +71,12 @@ Issues = "https://github.com/amazon-science/chronos-forecasting/issues"
 Chronos-Paper = "https://arxiv.org/abs/2403.07815"
 Chronos-2-Paper = "https://arxiv.org/abs/2510.15821"
 
+[tool.pytest.ini_options]
+markers = [
+  "slow: throughput benchmarks (run with -m slow)",
+  "gpu: requires NVIDIA GPU with CUDA (auto-skipped when unavailable)",
+]
+
 [tool.mypy]
 ignore_missing_imports = true
 
